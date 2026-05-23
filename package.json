@@ -1,0 +1,48 @@
+{
+  "name": "glossa",
+  "version": "1.0.0",
+  "description": "A community lexicon Discord bot (discord.js v14 + TypeScript)",
+  "type": "module",
+  "main": "src/index.ts",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "deploy": "tsx src/deploy-commands.ts",
+    "check": "tsc --noEmit",
+    "lint": "eslint . --fix",
+    "format": "treefmt",
+    "format:check": "treefmt --ci"
+  },
+  "keywords": [
+    "discord",
+    "discord.js",
+    "bot",
+    "typescript",
+    "dictionary",
+    "lexicon"
+  ],
+  "license": "MIT",
+  "packageManager": "pnpm@11.1.2",
+  "dependencies": {
+    "@anthropic-ai/sdk": "0.98.0",
+    "better-sqlite3": "12.10.0",
+    "consola": "^3.4.2",
+    "discord.js": "14.26.4",
+    "dotenv": "17.4.2",
+    "tsx": "4.22.3",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/better-sqlite3": "7.6.13",
+    "@types/node": "25.9.1",
+    "eslint": "10.4.0",
+    "eslint-config-prettier": "10.1.8",
+    "prettier": "3.8.3",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.59.4"
+  }
+}

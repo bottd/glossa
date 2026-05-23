@@ -1,0 +1,4 @@
+# Native modules whose install/build scripts pnpm is allowed to run.
+allowBuilds:
+  better-sqlite3: true
+  esbuild: true
