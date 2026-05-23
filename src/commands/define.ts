@@ -24,15 +24,15 @@ export const defineSub = {
 
     await interaction.deferReply();
 
-    const [definitions, references, images, dictionary] = await Promise.all([
-      store.getDefinitions(term),
+    const [notes, references, images, dictionary] = await Promise.all([
+      store.getCommunityNotes(term),
       store.getReferencesByTag(term),
       store.getImagesForTerm(term),
       getDictionary(term),
     ]);
 
-    const display = definitions[0]?.display ?? input.trim();
-    const embeds = buildLookupCard({ display, dictionary, definitions, references, images });
+    const display = notes[0]?.display ?? input.trim();
+    const embeds = buildLookupCard({ display, dictionary, notes, references, images });
     await interaction.editReply({ embeds });
   },
 

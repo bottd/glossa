@@ -12,7 +12,7 @@ export interface SaveReferenceInput {
  * File a Discord message as a reference under one or more tags. We store a
  * pointer (jump link + author), not the text. Image attachments are recorded
  * once against the reference; `getImagesForTerm` surfaces them under any of
- * its tags via the bookmark_tags join.
+ * its tags via the ref_tags join.
  */
 export async function saveMessageAsReference(
   input: SaveReferenceInput,

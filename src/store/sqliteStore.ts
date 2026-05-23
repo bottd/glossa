@@ -2,15 +2,15 @@ import Database from 'better-sqlite3';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 
-export interface DefinitionInput {
+export interface CommunityNoteInput {
   term: string; // normalized key
-  display: string; // term as the author typed it
-  definition: string;
+  display: string; // cased as the author input
+  body: string;
   authorId: string;
   authorTag: string;
 }
 
-export interface Definition extends DefinitionInput {
+export interface CommunityNote extends CommunityNoteInput {
   id: number;
   createdAt: number;
 }
@@ -58,18 +58,18 @@ export class SqliteStore {
 
   private migrate(): void {
     this.db.exec(`
-      CREATE TABLE IF NOT EXISTS definitions (
+      CREATE TABLE IF NOT EXISTS community_notes (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         term TEXT NOT NULL,
         display TEXT NOT NULL,
-        definition TEXT NOT NULL,
+        body TEXT NOT NULL,
         author_id TEXT NOT NULL,
         author_tag TEXT NOT NULL,
         created_at INTEGER NOT NULL
       );
-      CREATE INDEX IF NOT EXISTS idx_definitions_term ON definitions(term);
+      CREATE INDEX IF NOT EXISTS idx_community_notes_term ON community_notes(term);
 
-      CREATE TABLE IF NOT EXISTS bookmarks (
+      CREATE TABLE IF NOT EXISTS refs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         message_link TEXT,
         source_author_tag TEXT,
@@ -77,18 +77,18 @@ export class SqliteStore {
         created_at INTEGER NOT NULL
       );
 
-      CREATE TABLE IF NOT EXISTS bookmark_tags (
-        bookmark_id INTEGER NOT NULL REFERENCES bookmarks(id) ON DELETE CASCADE,
+      CREATE TABLE IF NOT EXISTS ref_tags (
+        ref_id INTEGER NOT NULL REFERENCES refs(id) ON DELETE CASCADE,
         tag TEXT NOT NULL,
         display TEXT NOT NULL,
-        PRIMARY KEY (bookmark_id, tag)
+        PRIMARY KEY (ref_id, tag)
       );
-      CREATE INDEX IF NOT EXISTS idx_bookmark_tags_tag ON bookmark_tags(tag);
+      CREATE INDEX IF NOT EXISTS idx_ref_tags_tag ON ref_tags(tag);
 
       CREATE TABLE IF NOT EXISTS images (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         term TEXT,
-        reference_id INTEGER REFERENCES bookmarks(id) ON DELETE CASCADE,
+        reference_id INTEGER REFERENCES refs(id) ON DELETE CASCADE,
         url TEXT NOT NULL,
         added_by TEXT NOT NULL,
         created_at INTEGER NOT NULL
@@ -97,12 +97,12 @@ export class SqliteStore {
     `);
   }
 
-  async addDefinition(input: DefinitionInput): Promise<Definition> {
+  async addCommunityNote(input: CommunityNoteInput): Promise<CommunityNote> {
     const createdAt = Date.now();
     const info = this.db
       .prepare(
-        `INSERT INTO definitions (term, display, definition, author_id, author_tag, created_at)
-         VALUES (@term, @display, @definition, @authorId, @authorTag, @createdAt)`,
+        `INSERT INTO community_notes (term, display, body, author_id, author_tag, created_at)
+         VALUES (@term, @display, @body, @authorId, @authorTag, @createdAt)`,
       )
       .run({ ...input, createdAt });
     return {
@@ -112,31 +112,31 @@ export class SqliteStore {
     };
   }
 
-  async getDefinitions(term: string): Promise<Definition[]> {
+  async getCommunityNotes(term: string): Promise<CommunityNote[]> {
     return this.db
       .prepare(
-        `SELECT id, term, display, definition,
+        `SELECT id, term, display, body,
                 author_id AS authorId, author_tag AS authorTag, created_at AS createdAt
-         FROM definitions WHERE term = ? ORDER BY created_at ASC`,
+         FROM community_notes WHERE term = ? ORDER BY created_at ASC`,
       )
-      .all(term) as Definition[];
+      .all(term) as CommunityNote[];
   }
 
   async addReference(input: ReferenceInput): Promise<Reference> {
     const createdAt = Date.now();
     const insertRef = this.db.prepare(
-      `INSERT INTO bookmarks (message_link, source_author_tag, added_by, created_at)
+      `INSERT INTO refs (message_link, source_author_tag, added_by, created_at)
        VALUES (@messageLink, @sourceAuthorTag, @addedBy, @createdAt)`,
     );
     const insertTag = this.db.prepare(
-      `INSERT OR IGNORE INTO bookmark_tags (bookmark_id, tag, display) VALUES (?, ?, ?)`,
+      `INSERT OR IGNORE INTO ref_tags (ref_id, tag, display) VALUES (?, ?, ?)`,
     );
 
     const id = this.db.transaction(() => {
       const info = insertRef.run({ ...input, createdAt });
-      const bookmarkId = Number(info.lastInsertRowid);
-      for (const t of input.tags) insertTag.run(bookmarkId, t.tag, t.display);
-      return bookmarkId;
+      const refId = Number(info.lastInsertRowid);
+      for (const t of input.tags) insertTag.run(refId, t.tag, t.display);
+      return refId;
     })();
 
     return { ...input, id, createdAt };
@@ -145,13 +145,13 @@ export class SqliteStore {
   async getReferencesByTag(tag: string): Promise<Reference[]> {
     const rows = this.db
       .prepare(
-        `SELECT b.id,
-                b.message_link AS messageLink,
-                b.source_author_tag AS sourceAuthorTag,
-                b.added_by AS addedBy, b.created_at AS createdAt
-         FROM bookmarks b
-         JOIN bookmark_tags bt ON bt.bookmark_id = b.id
-         WHERE bt.tag = ? ORDER BY b.created_at DESC`,
+        `SELECT r.id,
+                r.message_link AS messageLink,
+                r.source_author_tag AS sourceAuthorTag,
+                r.added_by AS addedBy, r.created_at AS createdAt
+         FROM refs r
+         JOIN ref_tags rt ON rt.ref_id = r.id
+         WHERE rt.tag = ? ORDER BY r.created_at DESC`,
       )
       .all(tag) as Omit<Reference, 'tags'>[];
 
@@ -161,16 +161,16 @@ export class SqliteStore {
     const placeholders = rows.map(() => '?').join(', ');
     const tagRows = this.db
       .prepare(
-        `SELECT bookmark_id AS bookmarkId, tag, display
-         FROM bookmark_tags WHERE bookmark_id IN (${placeholders})`,
+        `SELECT ref_id AS refId, tag, display
+         FROM ref_tags WHERE ref_id IN (${placeholders})`,
       )
-      .all(...rows.map((row) => row.id)) as (TagRef & { bookmarkId: number })[];
+      .all(...rows.map((row) => row.id)) as (TagRef & { refId: number })[];
 
     const tagsByRef = new Map<number, TagRef[]>();
-    for (const { bookmarkId, tag, display } of tagRows) {
-      const list = tagsByRef.get(bookmarkId) ?? [];
+    for (const { refId, tag, display } of tagRows) {
+      const list = tagsByRef.get(refId) ?? [];
       list.push({ tag, display });
-      tagsByRef.set(bookmarkId, list);
+      tagsByRef.set(refId, list);
     }
 
     return rows.map((row) => ({ ...row, tags: tagsByRef.get(row.id) ?? [] }));
@@ -195,8 +195,8 @@ export class SqliteStore {
         `SELECT i.id, i.term, i.reference_id AS referenceId, i.url,
                 i.added_by AS addedBy, i.created_at AS createdAt
          FROM images i
-         LEFT JOIN bookmark_tags bt ON bt.bookmark_id = i.reference_id
-         WHERE i.term = ? OR bt.tag = ?
+         LEFT JOIN ref_tags rt ON rt.ref_id = i.reference_id
+         WHERE i.term = ? OR rt.tag = ?
          GROUP BY i.id
          ORDER BY i.created_at ASC`,
       )
@@ -204,14 +204,14 @@ export class SqliteStore {
   }
 
   async searchTerms(query: string, limit = 25): Promise<string[]> {
-    const like = `%${query.toLowerCase()}%`;
+    const like = `%${query}%`;
     const rows = this.db
       .prepare(
         `SELECT display, MIN(term) AS term FROM (
-           SELECT display, term FROM definitions
+           SELECT display, term FROM community_notes
            UNION ALL
-           SELECT display, tag AS term FROM bookmark_tags
-         ) WHERE term LIKE ? GROUP BY term ORDER BY display ASC LIMIT ?`,
+           SELECT display, tag AS term FROM ref_tags
+         ) WHERE term LIKE ? COLLATE NOCASE GROUP BY term ORDER BY display ASC LIMIT ?`,
       )
       .all(like, limit) as { display: string }[];
     return rows.map((r) => r.display);

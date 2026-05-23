@@ -36,7 +36,7 @@ export const messageCreate = {
     if (message.guild) {
       await handleMentionReference(message);
     } else {
-      await handleDmDefinition(message);
+      await handleDmCommunityNote(message);
     }
   },
 } satisfies Event<typeof Events.MessageCreate>;
@@ -107,7 +107,7 @@ function stripMention(content: string, botId: string): string {
 }
 
 /** DM: `term :: note` adds a community note. */
-async function handleDmDefinition(message: Message): Promise<void> {
+async function handleDmCommunityNote(message: Message): Promise<void> {
   const text = message.content?.trim() ?? '';
   const sepIndex = text.indexOf(SEPARATOR);
   if (sepIndex === -1) {
@@ -123,10 +123,10 @@ async function handleDmDefinition(message: Message): Promise<void> {
   }
 
   const term = normalizeTerm(rawTerm);
-  await store.addDefinition({
+  await store.addCommunityNote({
     term,
     display: rawTerm,
-    definition: note,
+    body: note,
     authorId: message.author.id,
     authorTag: message.author.username,
   });

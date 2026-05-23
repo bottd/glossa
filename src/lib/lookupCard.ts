@@ -1,5 +1,5 @@
 import { EmbedBuilder } from 'discord.js';
-import type { Definition, ImageRef, Reference } from '../store/sqliteStore';
+import type { CommunityNote, ImageRef, Reference } from '../store/sqliteStore';
 import type { DictionaryMeaning } from '../services/dictionary';
 import { truncate } from './term';
 import { formatReferenceLine } from './reference';
@@ -17,19 +17,19 @@ const MAX_IMAGES = 4;
 export function buildLookupCard({
   display,
   dictionary,
-  definitions,
+  notes,
   references,
   images,
 }: {
   display: string;
   dictionary: DictionaryMeaning[] | null;
-  definitions: Definition[];
+  notes: CommunityNote[];
   references: Reference[];
   images: ImageRef[];
 }): EmbedBuilder[] {
   const embed = new EmbedBuilder().setColor(COLOR).setTitle(truncate(display, 256));
 
-  const hasContent = dictionary?.length || definitions.length || references.length || images.length;
+  const hasContent = dictionary?.length || notes.length || references.length || images.length;
 
   // Add a field, capping its value at the per-field limit and at whatever room
   // is left in the embed's total budget (title + all field text). Once the
@@ -44,7 +44,7 @@ export function buildLookupCard({
   };
 
   if (dictionary?.length) addField('📖 Dictionary', formatDictionary(dictionary));
-  if (definitions.length) addField('💬 Notes', formatDefinitions(definitions));
+  if (notes.length) addField('💬 Notes', formatCommunityNotes(notes));
   if (references.length) addField('🔖 References', formatReferences(references));
 
   if (!hasContent) {
@@ -76,8 +76,8 @@ function formatDictionary(meanings: DictionaryMeaning[]): string {
     .join('\n\n');
 }
 
-function formatDefinitions(definitions: Definition[]): string {
-  return definitions.map((d, i) => `**${i + 1}.** ${d.definition}\n— ${d.authorTag}`).join('\n\n');
+function formatCommunityNotes(notes: CommunityNote[]): string {
+  return notes.map((n, i) => `**${i + 1}.** ${n.body}\n— ${n.authorTag}`).join('\n\n');
 }
 
 function formatReferences(references: Reference[]): string {
